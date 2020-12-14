@@ -21,6 +21,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.support.v4.media.MediaDescriptionCompat;
+import android.support.v4.media.session.MediaSessionCompat;
 import android.util.Pair;
 import android.view.KeyEvent;
 import android.view.View;
@@ -33,6 +35,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.ControlDispatcher;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Player;
@@ -41,6 +44,8 @@ import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.drm.FrameworkMediaDrm;
 import com.google.android.exoplayer2.ext.ima.ImaAdsLoader;
+import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector;
+import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer.DecoderInitializationException;
 import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryException;
 import com.google.android.exoplayer2.offline.DownloadRequest;
@@ -58,6 +63,7 @@ import com.google.android.exoplayer2.ui.StyledPlayerView;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.util.ErrorMessageProvider;
 import com.google.android.exoplayer2.util.EventLogger;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.Util;
 import java.net.CookieHandler;
 import java.net.CookieManager;
@@ -101,6 +107,10 @@ public class PlayerActivity extends AppCompatActivity
   private boolean startAutoPlay;
   private int startWindow;
   private long startPosition;
+
+  // Media Session
+  private MediaSessionCompat mediaSession;
+  private MediaSessionConnector mediaSessionConnector;
 
   // Fields used only for ad playback.
 
@@ -159,6 +169,10 @@ public class PlayerActivity extends AppCompatActivity
         playerView.onResume();
       }
     }
+
+    if (mediaSession != null) {
+      mediaSession.setActive(true);
+    }
   }
 
   @Override
@@ -186,6 +200,10 @@ public class PlayerActivity extends AppCompatActivity
   @Override
   public void onStop() {
     super.onStop();
+    if (mediaSession != null) {
+      mediaSession.setActive(true);
+    }
+
     if (Util.SDK_INT > 23) {
       if (playerView != null) {
         playerView.onPause();
@@ -299,6 +317,11 @@ public class PlayerActivity extends AppCompatActivity
       playerView.setPlayer(player);
       debugViewHelper = new DebugTextViewHelper(player, debugTextView);
       debugViewHelper.start();
+
+      mediaSession = new MediaSessionCompat(this, "sample");
+      mediaSessionConnector = new MediaSessionConnector(mediaSession);
+      mediaSessionConnector.setPlayer(player);
+      mediaSession.setCallback(new PlaybackController());
     }
     boolean haveStartPosition = startWindow != C.INDEX_UNSET;
     if (haveStartPosition) {
@@ -387,6 +410,9 @@ public class PlayerActivity extends AppCompatActivity
     }
     if (adsLoader != null) {
       adsLoader.setPlayer(null);
+    }
+    if (mediaSession != null) {
+      mediaSession.release();
     }
   }
 
@@ -560,4 +586,31 @@ public class PlayerActivity extends AppCompatActivity
     MediaItem.DrmConfiguration drmConfiguration = item.playbackProperties.drmConfiguration;
     return drmConfiguration != null ? drmConfiguration.requestHeaders : null;
   }
+
+  private class PlaybackController extends MediaSessionCompat.Callback {
+
+    @Override
+    public void onPlay() {
+      Log.e(this.getClass().getSimpleName(), "onPlay");
+      player.setPlayWhenReady(true);
+    }
+
+    @Override
+    public void onPause() {
+      Log.e(this.getClass().getSimpleName(), "onPause");
+      player.setPlayWhenReady(false);
+    }
+
+    @Override
+    public void onStop() {
+      Log.e(this.getClass().getSimpleName(), "onStop");
+    }
+
+    @Override
+    public void onSeekTo(long pos) {
+      Log.e(this.getClass().getSimpleName(), "onSeekTo position:" + pos + " player.getCurrentWindowIndex():" + player.getCurrentWindowIndex());
+      player.seekTo(player.getCurrentWindowIndex(), pos);
+    }
+  }
+
 }

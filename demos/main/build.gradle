@@ -65,6 +65,7 @@ android {
 }
 
 dependencies {
+    implementation project(path: ':extension-mediasession')
     compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
     implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
     implementation 'androidx.appcompat:appcompat:' + androidxAppCompatVersion
